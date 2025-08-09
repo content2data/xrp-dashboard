@@ -1,104 +1,141 @@
 <!DOCTYPE html>
 <html lang="nl">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>XRP Nieuws Dashboard</title>
-<style>
-  body { font-family: Arial, sans-serif; margin: 0; background: #f4f4f4; }
-  header { background: #222; color: white; padding: 10px; text-align: center; }
-  #percent-bar { display: flex; height: 30px; font-size: 14px; font-weight: bold; color: white; }
-  .buy-bar { background: green; text-align: center; }
-  .sell-bar { background: red; text-align: center; }
-  #news-list { padding: 20px; }
-  .news-item { background: white; margin-bottom: 15px; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-  .news-title a { font-size: 18px; font-weight: bold; color: #0077cc; text-decoration: none; }
-  .news-title a:hover { text-decoration: underline; }
-  .news-meta { font-size: 12px; color: #666; margin-top: 5px; }
-</style>
+    <meta charset="UTF-8" />
+    <title>XRP Nieuws Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f4f4;
+            margin: 0; padding: 0;
+        }
+        header {
+            background: #222;
+            color: #fff;
+            padding: 10px;
+            text-align: center;
+        }
+        .bar-container {
+            display: flex;
+            height: 25px;
+            margin: 10px auto;
+            width: 90%;
+            border-radius: 5px;
+            overflow: hidden;
+            background: #ccc;
+        }
+        .buy-bar {
+            background: #4caf50;
+            height: 100%;
+            transition: width 0.5s ease;
+        }
+        .sell-bar {
+            background: #f44336;
+            height: 100%;
+            transition: width 0.5s ease;
+        }
+        ul {
+            list-style: none;
+            padding: 0;
+        }
+        li {
+            background: #fff;
+            margin: 8px;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        a {
+            color: #007bff;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        .time {
+            font-size: 0.85em;
+            color: gray;
+        }
+    </style>
 </head>
 <body>
 
 <header>
-  <h1>📊 XRP Nieuws Dashboard</h1>
-  <div id="percent-bar"></div>
+    <h1>XRP Nieuws Dashboard</h1>
+    <div class="bar-container">
+        <div class="buy-bar" id="buyBar" style="width:50%"></div>
+        <div class="sell-bar" id="sellBar" style="width:50%"></div>
+    </div>
+    <p>Koop (XRP): <span id="buyPercent">50</span>% | Verkoop (XRP): <span id="sellPercent">50</span>%</p>
 </header>
 
-<div id="news-list">Nieuws wordt geladen...</div>
+<main>
+    <ul id="newsList"></ul>
+</main>
 
 <script>
-const cryptoPanicKey = "7fb94029e8f1ba018c62a1b03c7dca4d56c0b01c";
+    const API_KEY = "7fb94029e8f1ba018c62a1b03c7dca4d56c0b01c"; // Jouw CryptoPanic API key
+    const API_URL = `https://cryptopanic.com/api/developer/v2/posts/?auth_token=${API_KEY}&public=true&currencies=XRP`;
 
-async function getXrpBuyerSellerPercentage() {
-  try {
-    const res = await fetch("https://api.binance.com/api/v3/depth?symbol=XRPUSDT&limit=100");
-    const data = await res.json();
-    const totalBids = data.bids.reduce((sum, bid) => sum + parseFloat(bid[1]), 0);
-    const totalAsks = data.asks.reduce((sum, ask) => sum + parseFloat(ask[1]), 0);
-    const total = totalBids + totalAsks;
-    return {
-      buyers: ((totalBids / total) * 100).toFixed(1),
-      sellers: ((totalAsks / total) * 100).toFixed(1)
-    };
-  } catch (err) {
-    console.error("Fout bij ophalen marktdata:", err);
-    return { buyers: 50, sellers: 50 };
-  }
-}
+    async function fetchNews() {
+        try {
+            const res = await fetch(API_URL);
+            const data = await res.json();
 
-async function loadNews() {
-  const newsContainer = document.getElementById('news-list');
-  const barContainer = document.getElementById('percent-bar');
-  newsContainer.innerHTML = 'Nieuws wordt geladen...';
-  barContainer.innerHTML = '';
+            const newsList = document.getElementById('newsList');
+            newsList.innerHTML = '';
 
-  try {
-    // Koop/verkoop data ophalen
-    const stats = await getXrpBuyerSellerPercentage();
-    barContainer.innerHTML = `
-      <div class="buy-bar" style="width:${stats.buyers}%;">${stats.buyers}% kopen</div>
-      <div class="sell-bar" style="width:${stats.sellers}%;">${stats.sellers}% verkopen</div>
-    `;
+            data.results.slice(0, 10).forEach(item => {
+                const li = document.createElement('li');
 
-    // XRP nieuws ophalen van CryptoPanic
-    const url = `https://cryptopanic.com/api/developer/v2/posts/?auth_token=${cryptoPanicKey}&public=true&currencies=XRP`;
-    const res = await fetch(url);
-    const data = await res.json();
+                const link = item.url 
+                    || (item.source && item.source.url) 
+                    || `https://cryptopanic.com/news/${item.id}`;
 
-    if (!data.results || data.results.length === 0) {
-      newsContainer.innerHTML = 'Geen nieuws gevonden.';
-      return;
+                const date = new Date(item.published_at);
+                const formattedDate = date.toLocaleDateString('nl-NL') + ' ' + date.toLocaleTimeString('nl-NL');
+
+                li.innerHTML = `<a href="${link}" target="_blank" rel="noopener noreferrer">${item.title}</a><br>
+                                <span class="time">${formattedDate}</span>`;
+                newsList.appendChild(li);
+            });
+
+        } catch (err) {
+            console.error("Fout bij laden nieuws:", err);
+        }
     }
 
-    // Nieuwste eerst, alleen top 10
-    let html = '';
-    data.results
-      .sort((a, b) => new Date(b.published_at) - new Date(a.published_at))
-      .slice(0, 10)
-      .forEach(item => {
-        const date = new Date(item.published_at).toLocaleString("nl-NL");
-        const title = item.title || (item.source && item.source.title) || "Onbekende titel";
-        const link = item.url || (item.source && item.source.url) || "#";
-        const sourceName = item.source && item.source.title ? item.source.title : "Onbekende bron";
+    async function fetchMarketData() {
+        try {
+            const res = await fetch("https://api.binance.com/api/v3/depth?symbol=XRPUSDT&limit=100");
+            const data = await res.json();
 
-        html += `<div class="news-item">
-          <div class="news-title">
-            <a href="${link}" target="_blank" rel="noopener noreferrer">${title}</a>
-          </div>
-          <div class="news-meta">Bron: ${sourceName} • ${date}</div>
-        </div>`;
-      });
+            const totalBids = data.bids.reduce((sum, bid) => sum + parseFloat(bid[1]), 0);
+            const totalAsks = data.asks.reduce((sum, ask) => sum + parseFloat(ask[1]), 0);
+            const total = totalBids + totalAsks;
 
-    newsContainer.innerHTML = html;
+            const buyers = ((totalBids / total) * 100).toFixed(1);
+            const sellers = ((totalAsks / total) * 100).toFixed(1);
 
-  } catch (err) {
-    newsContainer.innerHTML = 'Kon het nieuws niet laden.';
-    console.error(err);
-  }
-}
+            document.getElementById('buyBar').style.width = buyers + '%';
+            document.getElementById('sellBar').style.width = sellers + '%';
+            document.getElementById('buyPercent').textContent = buyers;
+            document.getElementById('sellPercent').textContent = sellers;
 
-loadNews();
-setInterval(loadNews, 300000); // elke 5 min verversen
+        } catch (err) {
+            console.error("Fout bij laden marktdata:", err);
+        }
+    }
+
+    async function refreshAll() {
+        await fetchNews();
+        await fetchMarketData();
+    }
+
+    refreshAll();
+    setInterval(refreshAll, 5 * 60 * 1000); // refresh elke 5 minuten
+
 </script>
 
 </body>
