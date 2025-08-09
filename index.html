@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>XRP Nieuws Dashboard</title>
+<style>
+  body { font-family: Arial, sans-serif; margin: 0; background: #f4f4f4; }
+  header { background: #222; color: white; padding: 10px; text-align: center; }
+  #percent-bar { display: flex; height: 30px; font-size: 14px; font-weight: bold; color: white; }
+  .buy-bar { background: green; text-align: center; }
+  .sell-bar { background: red; text-align: center; }
+  #news-list { padding: 20px; }
+  .news-item { background: white; margin-bottom: 15px; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+  .news-title a { font-size: 18px; font-weight: bold; color: #0077cc; text-decoration: none; }
+  .news-title a:hover { text-decoration: underline; }
+  .news-meta { font-size: 12px; color: #666; margin-top: 5px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📊 XRP Nieuws Dashboard</h1>
+  <div id="percent-bar"></div>
+</header>
+
+<div id="news-list">Nieuws wordt geladen...</div>
+
+<script>
+const cryptoPanicKey = "7fb94029e8f1ba018c62a1b03c7dca4d56c0b01c";
+
+async function getXrpBuyerSellerPercentage() {
+  try {
+    const res = await fetch("https://api.binance.com/api/v3/depth?symbol=XRPUSDT&limit=100");
+    const data = await res.json();
+    const totalBids = data.bids.reduce((sum, bid) => sum + parseFloat(bid[1]), 0);
+    const totalAsks = data.asks.reduce((sum, ask) => sum + parseFloat(ask[1]), 0);
+    const total = totalBids + totalAsks;
+    return {
+      buyers: ((totalBids / total) * 100).toFixed(1),
+      sellers: ((totalAsks / total) * 100).toFixed(1)
+    };
+  } catch (err) {
+    console.error("Fout bij ophalen marktdata:", err);
+    return { buyers: 50, sellers: 50 };
+  }
+}
+
+async function loadNews() {
+  const newsContainer = document.getElementById('news-list');
+  const barContainer = document.getElementById('percent-bar');
+  newsContainer.innerHTML = 'Nieuws wordt geladen...';
+  barContainer.innerHTML = '';
+
+  try {
+    // Koop/verkoop data ophalen
+    const stats = await getXrpBuyerSellerPercentage();
+    barContainer.innerHTML = `
+      <div class="buy-bar" style="width:${stats.buyers}%;">${stats.buyers}% kopen</div>
+      <div class="sell-bar" style="width:${stats.sellers}%;">${stats.sellers}% verkopen</div>
+    `;
+
+    // XRP nieuws ophalen van CryptoPanic
+    const url = `https://cryptopanic.com/api/developer/v2/posts/?auth_token=${cryptoPanicKey}&public=true&currencies=XRP`;
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (!data.results || data.results.length === 0) {
+      newsContainer.innerHTML = 'Geen nieuws gevonden.';
+      return;
+    }
+
+    // Nieuwste eerst, alleen top 10
+    let html = '';
+    data.results
+      .sort((a, b) => new Date(b.published_at) - new Date(a.published_at))
+      .slice(0, 10)
+      .forEach(item => {
+        const date = new Date(item.published_at).toLocaleString("nl-NL");
+        const title = item.title || (item.source && item.source.title) || "Onbekende titel";
+        const link = item.url || (item.source && item.source.url) || "#";
+        const sourceName = item.source && item.source.title ? item.source.title : "Onbekende bron";
+
+        html += `<div class="news-item">
+          <div class="news-title">
+            <a href="${link}" target="_blank" rel="noopener noreferrer">${title}</a>
+          </div>
+          <div class="news-meta">Bron: ${sourceName} • ${date}</div>
+        </div>`;
+      });
+
+    newsContainer.innerHTML = html;
+
+  } catch (err) {
+    newsContainer.innerHTML = 'Kon het nieuws niet laden.';
+    console.error(err);
+  }
+}
+
+loadNews();
+setInterval(loadNews, 300000); // elke 5 min verversen
+</script>
+
+</body>
+</html>
